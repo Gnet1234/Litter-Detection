@@ -9,7 +9,7 @@ import numpy as np
 
 DATADIR = r"C:\Users\garne\OneDrive\Documents\Ray Summer Project\Dataset"
 # Used to identiy the directory for the dataset.
-CATEGORIES = ["Garbage Bag Images", "Paper Bag Images", "Plastic Bag Images"]
+CATEGORIES = ["Plastic Bag Images", "Cigarette", "Cans"]
 # Creates the different categores that the code will use. 
 
 for category in CATEGORIES:
