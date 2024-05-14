@@ -17,7 +17,17 @@ X = X/255.0
 # Normilization process, which is used to scale down the image and reduce the spread of pixels. 
 
 NAME = "Litter"
-# This is for tensoboard so it can show our data. 
+# This is for tensoboard so it can show our data (It's the name of the folder that contains the logs). 
+
+# Define a learning rate schedule
+learning_rate_schedule = tf.keras.optimizers.schedules.ExponentialDecay(
+    initial_learning_rate=0.00000001,
+    decay_steps=10000,
+    decay_rate=0.96
+)
+
+# Create an optimizer with the learning rate schedule
+optimizer = tf.keras.optimizers.Adam(learning_rate=learning_rate_schedule)
 
 model = Sequential()
 
@@ -44,7 +54,7 @@ tensorboard = TensorBoard(log_dir="logs/{}".format(NAME))
 early_stopper = EarlyStopping(monitor = 'accuracy', min_delta = 0.01, patience = 3, verbose = 1, mode = 'max')
 
 model.compile(loss='binary_crossentropy',
-              optimizer='adam',
+              optimizer = optimizer,
               metrics=['accuracy'])
 
 # callback is used in conjunction with training using model.fit() to save a model or weights (in a checkpoint file) at some interval, so the model or weights can be loaded later to continue the training from the state saved.
