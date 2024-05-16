@@ -1,0 +1,37 @@
+from pyparrot.Minidrone import Mambo
+import cv2
+
+# Connect to the drone
+drone = Mambo("drone_mambo_id", use_wifi=True)
+drone.connect(num_retries=3)
+
+if drone.is_connected():
+    print("Connected to the drone")
+
+    # Start video stream
+    drone.set_video_stream_mode('high')
+    drone.start_video_stream()
+
+    # Grab a frame from the video stream
+    while True:
+        frame = drone.get_latest_valid_picture()
+
+        if frame is not None:
+            # Convert the frame to an OpenCV image
+            image = cv2.imdecode(frame, cv2.IMREAD_COLOR)
+            
+            # Process the image (e.g., convert to grayscale)
+            gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+            
+            # Display the image
+            cv2.imshow('Drone Camera Feed', gray)
+            
+            if cv2.waitKey(1) & 0xFF == ord('q'):
+                break
+
+    # Stop video stream
+    drone.stop_video_stream()
+
+# Disconnect from the drone
+drone.disconnect()
+cv2.destroyAllWindows()
