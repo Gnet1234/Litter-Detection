@@ -1,6 +1,9 @@
 import olympe
+import logging
 
-# To use this code paste, python /mnt/c/Drone/venv/Connection_Test.py.
+# Set up logging
+logging.basicConfig(level=logging.DEBUG)
+
 # IP address of the drone
 DRONE_IP = "192.168.42.21"  # Replace with your drone's IP address
 
@@ -13,7 +16,7 @@ def test_connection():
         drone.connect()
 
         # If the connection is successful, print a success message
-        #print("Drone connection successful!")
+        print("Drone connection successful!")
 
         # Disconnect from the drone
         drone.disconnect()
