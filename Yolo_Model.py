@@ -1,6 +1,8 @@
 from ultralytics import YOLO
 import torch
 
+# Link to dataset: https://universe.roboflow.com/divya-lzcld/taco-mqclx/dataset/3
+
 # Initialize YOLO model
 model = YOLO("yolov8n.pt")
 
