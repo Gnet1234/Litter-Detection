@@ -7,7 +7,7 @@ import torch
 model = YOLO("yolov8n.pt")
 
 # Train the model
-results = model.train(data=r'C:\Users\garne\anaconda3\envs\TensorFlowObjectDetection\TensorFlow\Car Dataset Yolov5\data.yaml', epochs=1, epochs=1, optimizer = 'Adam', plots = True, patience = 2)
+results = model.train(data=r'C:\Users\garne\anaconda3\envs\TensorFlowObjectDetection\TensorFlow\Car Dataset Yolov5\data.yaml', epochs=1, optimizer = 'Adam', plots = True, patience = 2)
 
 # Print the custom model class
 print("Custom model class:", model.model)
