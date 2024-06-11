@@ -1,0 +1,25 @@
+from ultralytics import YOLO
+import torch
+
+# Initialize YOLO model
+model = YOLO("yolov8n.pt")
+
+# Check if GPU is available and set the device
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+if device.type == 'cuda':
+    print("Using GPU:", torch.cuda.get_device_name(0))
+else:
+    print("Using CPU")
+
+# Move model to the GPU
+model.to(device)
+
+# Train the model (YOLO's train method should handle device internally)
+results = model.train(data=r'C:\Users\garne\anaconda3\envs\TensorFlowObjectDetection\TensorFlow\Car Dataset Yolov5\data.yaml', epochs=1, optimizer='Adam', plots=True, patience=2)
+
+# Print the custom model class
+print("Custom model class:", model.model)
+
+# Save the trained model's state dictionary
+save_path = r'C:\Users\garne\anaconda3\envs\TensorFlowObjectDetection\TensorFlow\models\yolov5_car.pt'
+model.save(save_path)
