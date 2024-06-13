@@ -1,0 +1,28 @@
+from ultralytics import YOLO
+import cv2
+
+# Load a pretrained YOLOv8 model
+model = YOLO("yolov8n.pt")
+
+#Specify WebCam path
+cap=cv2.VideoCapture(1)
+
+#f-b-f analysis
+while True:
+    #Frame-by-frame video capture
+    connected, frame= cap.read()
+    if connected:
+
+    #Obtain results from detection with YoloV8 model on the frame
+    results= model(frame)
+
+    #Plot boundary & image masking from obtained results in f2f format
+    annotated_frame=results[0].plot()
+
+    #display results
+    cv2.imshow('Machine Vision',annotated_frame)
+
+    #Stop Process press 'q'
+    if cv2.waitKey(1) ==ord('q'):
+        break
+
