@@ -12,6 +12,7 @@ olympe.log.update_config({"loggers": {"olympe": {"level": "WARNING"}}})
 DRONE_IP = os.environ.get("DRONE_IP", "192.168.42.1")
 DRONE_RTSP_PORT = os.environ.get("DRONE_RTSP_PORT")
 
+# Uses parrot olympe, sdl2 and OpenGL 3.1.0 as libraries. 
 
 class StreamingExample:
     def __init__(self):
