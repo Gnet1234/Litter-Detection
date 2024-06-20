@@ -1,3 +1,4 @@
+from __future__ import print_function
 import csv
 import math
 import os
@@ -6,7 +7,7 @@ import shlex
 import subprocess
 import tempfile
 import threading
-
+import inputs  # Importing the gamepad library
 import olympe
 from olympe.messages.ardrone3.Piloting import TakeOff, Landing
 from olympe.messages.ardrone3.Piloting import moveBy
@@ -15,6 +16,7 @@ from olympe.messages.ardrone3.PilotingSettings import MaxTilt
 from olympe.messages.ardrone3.PilotingSettingsState import MaxTiltChanged
 from olympe.messages.ardrone3.GPSSettingsState import GPSFixStateChanged
 from olympe.video.renderer import PdrawRenderer
+
 
 
 olympe.log.update_config({"loggers": {"olympe": {"level": "WARNING"}}})
@@ -160,34 +162,52 @@ class StreamingExample:
         # }[yuv_frame.format()]
 
     def fly(self):
-        # Takeoff, fly, land, ...
-        print("Takeoff if necessary...")
-        self.drone(
-            FlyingStateChanged(state="hovering", _policy="check")
-            | FlyingStateChanged(state="flying", _policy="check")
-            | (
-                GPSFixStateChanged(fixed=1, _timeout=10, _policy="check_wait")
-                >> (
-                    TakeOff(_no_expect=True)
-                    & FlyingStateChanged(
-                        state="hovering", _timeout=10, _policy="check_wait"
-                    )
-                )
-            )
-        ).wait()
-        # Execute the predefined flight path
-        print("Executing predefined flight path...")
-        self.drone(
-            moveBy(8, 0, 0, 0)
-            >> FlyingStateChanged(state="hovering", _timeout=5)
-            >> moveBy(0, 8, 0, 0)
-            >> FlyingStateChanged(state="hovering", _timeout=5)
-            >> moveBy(-8, 0, 0, 0)
-            >> FlyingStateChanged(state="hovering", _timeout=5)
-            >> moveBy(0, -8, 0, 0)
-            >> FlyingStateChanged(state="hovering", _timeout=5)
-            >> Landing()
-        ).wait()
+
+        try:
+            while True:
+                events = inputs.get_gamepad()
+                for event in events:
+                    if event.ev_type == 'Absolute':
+                        if event.code == 'ABS_X':
+                            x_value = event.state
+                            if x_value > 20000:  # Right
+                                self.drone(moveBy(0, 1, 0, 0)).wait()
+                                print("Moving Right")
+                            elif x_value < -20000:  # Left
+                                self.drone(moveBy(0, -1, 0, 0)).wait()
+                                print("Moving Left")
+                        elif event.code == 'ABS_Y':
+                            y_value = event.state
+                            if y_value > 20000:  # Backwards
+                                self.drone(moveBy(-1, 0, 0, 0)).wait()
+                                print("Moving Backwards")
+                            elif y_value < -20000:  # Forwards
+                                self.drone(moveBy(1, 0, 0, 0)).wait()
+                                print("Moving Forwards")
+                        elif event.code == 'ABS_RY':
+                            y_value2 = event.state
+                            if y_value2 > 20000:  # Downward
+                                self.drone(moveBy(0, 0, -1, 0)).wait()
+                                print("Moving Downwards")
+                            elif y_value2 < -20000:  # Upwards
+                                self.drone(moveBy(0, 0, 1, 0)).wait()
+                                print("Moving Upwards")
+                    elif event.ev_type == 'Key':
+                        if event.code == 'BTN_SOUTH' and event.state == 1:  # A button
+                            self.drone(TakeOff())
+                            print("TakeOff")
+                        elif event.code == 'BTN_EAST' and event.state == 1:  # B button
+                            self.drone(Landing())
+                            print("Landing")
+                        elif event.code == 'BTN_WEST' and event.state == 1:  # Y button
+                            self.drone(moveBy(0, 0, 0, 1)).wait()
+                            print("Turning")
+                        # Add more mappings for other buttons as needed
+        except KeyboardInterrupt:
+            print("Stopping control with Xbox controller...")
+
+        print("Landing...")
+        self.drone(Landing() >> FlyingStateChanged(state="landed", _timeout=5)).wait()
         print("Landed\n")
 
     def replay_with_vlc(self):
