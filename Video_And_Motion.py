@@ -16,6 +16,7 @@ from olympe.messages.ardrone3.PilotingSettings import MaxTilt
 from olympe.messages.ardrone3.PilotingSettingsState import MaxTiltChanged
 from olympe.messages.ardrone3.GPSSettingsState import GPSFixStateChanged
 from olympe.video.renderer import PdrawRenderer
+# Uses the contoller to move the drone.
 
 
 
