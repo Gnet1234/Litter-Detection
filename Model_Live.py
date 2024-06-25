@@ -14,7 +14,8 @@ olympe.log.update_config({"loggers": {"olympe": {"level": "WARNING"}}})
 DRONE_IP = os.environ.get("DRONE_IP", "192.168.42.1")
 DRONE_RTSP_PORT = os.environ.get("DRONE_RTSP_PORT")
 
-
+Model_Path = r"/home/labpc/Downloads/yolov8n-seg.pt"
+model = YOLO(Model_Path)
 class StreamingExample:
     def __init__(self):
         self.drone = olympe.Drone(DRONE_IP)
@@ -77,8 +78,12 @@ class StreamingExample:
             yuv_data = yuv_frame.as_ndarray()
             yuv_data = yuv_data.reshape((height * 3 // 2, width))
             bgr_frame = cv2.cvtColor(yuv_data, cv2.COLOR_YUV2BGR_I420)
+            results = model(bgr_frame)
+            # Plot boundary & image masking from obtained results in f2f format
+            annotated_frame = results[0].plot()
             # Display the frame
-            cv2.imshow("Drone Feed", bgr_frame)
+            cv2.imshow('Machine Vision', annotated_frame)
+            #cv2.imshow("Drone Feed", bgr_frame)
             if cv2.waitKey(1) & 0xFF == ord('q'):
                 break
             yuv_frame.unref()
@@ -120,7 +125,7 @@ def test_streaming():
     streaming_example.start()
 
     # Adjust this time to test the live video feed (in seconds)
-    test_duration = 70  # 70 seconds
+    test_duration = 500  # 70 seconds
 
     try:
         # Let the streaming run for the specified duration
@@ -133,4 +138,3 @@ def test_streaming():
 
 if __name__ == "__main__":
     test_streaming()
-
