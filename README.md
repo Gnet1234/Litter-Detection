@@ -18,3 +18,5 @@ The following codes show the steps that were taken to develop the objective:
 
 More information about the inputs library can be found here: https://inputs.readthedocs.io/en/latest/
 
+- Video_Test: This code is the same as the Video_And_Motion code, but it doesn’t have the ability to control the motion of the drone. This code was used to test the compatibility of the drones video feature. 
+
