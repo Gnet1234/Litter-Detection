@@ -11,7 +11,7 @@ pip install ultralytics
 More information can be found here:
 https://docs.ultralytics.com
 
-The following codes show the steps that were taken to develop the objective:
+The following codes show the steps that were taken to develop the objective, and are in the Important Files forlder:
 - GPU-TRAIN: This code trains the model, using the GPU of the computer. It uses cuda to achieve this, and it was used with a windows laptop with a nvidia GPU. 
 
 - Video_And_Motion: This code captures the video from the drone, and passes it through the object detection model. It also uses the inputs library which allows for the drone to be controlled by a gamepad.
