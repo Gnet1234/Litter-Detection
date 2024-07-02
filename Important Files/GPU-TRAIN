@@ -25,6 +25,8 @@ def main():
         batch=16,
         device=device  # Use the device explicitly
     )
+    # Patience controls the amount of epochs that can happen without an increase in accuray before the cycle stops.
+    # Plot tells the code to plot the results in multiple graphs. 
 
 if __name__ == '__main__':
     main()
