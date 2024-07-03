@@ -10,6 +10,7 @@ from olympe.messages.ardrone3.Piloting import moveBy
 from olympe.messages.ardrone3.PilotingState import FlyingStateChanged
 import inputs
 import numpy as np
+import queue  # Import queue module
 
 olympe.log.update_config({"loggers": {"olympe": {"level": "WARNING"}}})
 
@@ -31,6 +32,7 @@ class StreamingExample:
         )
         self.h264_stats_writer.writeheader()
         self.frame_queue = multiprocessing.Queue()
+        self.processed_frame_queue = multiprocessing.Queue()
         self.processes = []
 
     def start(self):
@@ -58,6 +60,8 @@ class StreamingExample:
         self.processes = [multiprocessing.Process(target=self.yuv_frame_processing) for _ in range(num_processes)]
         for p in self.processes:
             p.start()
+
+        self.process_video_output()
 
     def stop(self):
         for p in self.processes:
@@ -90,9 +94,19 @@ class StreamingExample:
             results = model(bgr_frame_resized)
             annotated_frame = results[0].plot()
 
-            cv2.imshow('Machine Vision', annotated_frame)
+            self.processed_frame_queue.put(annotated_frame)
+
+    def process_video_output(self):
+        while True:
+            try:
+                frame = self.processed_frame_queue.get(timeout=0.1)
+            except queue.Empty:
+                continue
+
+            cv2.imshow('Machine Vision', frame)
             if cv2.waitKey(1) & 0xFF == ord('q'):
                 break
+
         cv2.destroyAllWindows()
 
     def flush_cb(self, stream):
