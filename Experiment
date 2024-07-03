@@ -75,13 +75,20 @@ class StreamingExample:
     def yuv_frame_cb(self, yuv_frame):
         yuv_frame.ref()
         frame_info = yuv_frame.info()
+
+        # Debugging: Print the structure of frame_info to find the correct keys
+        print("Frame Info Keys:", frame_info.keys())
+        print("Frame Info:", frame_info)
+
         height, width = frame_info["raw"]["frame"]["info"]["height"], frame_info["raw"]["frame"]["info"]["width"]
         yuv_data = yuv_frame.as_ndarray().reshape((height * 3 // 2, width))
         bgr_frame = cv2.cvtColor(yuv_data, cv2.COLOR_YUV2BGR_I420)
         yuv_frame.unref()
 
-        # Skip frames to reduce processing load
-        if yuv_frame.info()["frame"]["frame_number"] % self.frame_skip == 0:
+        # Find the correct key for the frame number
+        frame_number = frame_info["raw"]["frame"].get("frame_number")
+        
+        if frame_number is not None and frame_number % self.frame_skip == 0:
             self.frame_queue.put(bgr_frame)
 
     def yuv_frame_processing(self):
