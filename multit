@@ -91,25 +91,25 @@ class StreamingExample:
             :type yuv_frame: olympe.VideoFrame
         """
         yuv_frame.ref()
-        self.frame_queue.put_nowait(yuv_frame)
+        info = yuv_frame.info()
+        height, width = info["raw"]["frame"]["info"]["height"], info["raw"]["frame"]["info"]["width"]
+        yuv_data = yuv_frame.as_ndarray()
+        self.frame_queue.put((yuv_data, height, width))
+        yuv_frame.unref()
 
     def yuv_frame_processing(self):
         while True:
             try:
-                yuv_frame = self.frame_queue.get(timeout=0.1)
+                yuv_data, height, width = self.frame_queue.get(timeout=0.1)
             except queue.Empty:
                 continue
-            # Convert YUV frame to OpenCV format
-            info = yuv_frame.info()
-            height, width = info["raw"]["frame"]["info"]["height"], info["raw"]["frame"]["info"]["width"]
-            yuv_data = yuv_frame.as_ndarray()
+            # Convert YUV data to OpenCV format
             yuv_data = yuv_data.reshape((height * 3 // 2, width))
             bgr_frame = cv2.cvtColor(yuv_data, cv2.COLOR_YUV2BGR_I420)
             results = model(bgr_frame)
             # Plot boundary & image masking from obtained results in f2f format
             annotated_frame = results[0].plot()
             self.processed_frame_queue.put(annotated_frame)
-            yuv_frame.unref()
 
     def process_video_output(self):
         while True:
@@ -128,7 +128,7 @@ class StreamingExample:
         if stream["vdef_format"] != olympe.VDEF_I420:
             return True
         while not self.frame_queue.empty():
-            self.frame_queue.get_nowait().unref()
+            self.frame_queue.get_nowait()
         return True
 
     def start_cb(self):
