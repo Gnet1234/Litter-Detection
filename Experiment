@@ -1,22 +1,23 @@
-from ultralytics import YOLO
-import cv2
 import multiprocessing
-import tempfile
 import os
 import csv
-import olympe
-from olympe.messages.ardrone3.Piloting import TakeOff, Landing
-from olympe.messages.ardrone3.Piloting import moveBy
-from olympe.messages.ardrone3.PilotingState import FlyingStateChanged
-import inputs
+import tempfile
+import cv2
 import numpy as np
-import queue  # Import queue module
+import queue
+import inputs
+from ultralytics import YOLO
+import olympe
+from olympe.messages.ardrone3.Piloting import TakeOff, Landing, moveBy
+from olympe.messages.ardrone3.PilotingState import FlyingStateChanged
 
+# Set Olympe logging level to WARNING to reduce verbosity
 olympe.log.update_config({"loggers": {"olympe": {"level": "WARNING"}}})
 
-DRONE_IP = os.environ.get("DRONE_IP", "192.168.42.1")
-DRONE_RTSP_PORT = os.environ.get("DRONE_RTSP_PORT")
+DRONE_IP = os.getenv("DRONE_IP", "192.168.42.1")
+DRONE_RTSP_PORT = os.getenv("DRONE_RTSP_PORT")
 
+# Load YOLO model
 Model_Path = r"/home/labpc/Downloads/yolov8n-seg.pt"
 model = YOLO(Model_Path)
 
@@ -27,13 +28,12 @@ class StreamingExample:
         print(f"Olympe streaming example output dir: {self.tempd}")
         self.h264_frame_stats = []
         self.h264_stats_file = open(os.path.join(self.tempd, "h264_stats.csv"), "w+")
-        self.h264_stats_writer = csv.DictWriter(
-            self.h264_stats_file, ["fps", "bitrate"]
-        )
+        self.h264_stats_writer = csv.DictWriter(self.h264_stats_file, ["fps", "bitrate"])
         self.h264_stats_writer.writeheader()
         self.frame_queue = multiprocessing.Queue()
         self.processed_frame_queue = multiprocessing.Queue()
         self.processes = []
+        self.frame_skip = 5  # Process every 5th frame
 
     def start(self):
         assert self.drone.connect(retry=3)
@@ -76,12 +76,13 @@ class StreamingExample:
         yuv_frame.ref()
         frame_info = yuv_frame.info()
         height, width = frame_info["raw"]["frame"]["info"]["height"], frame_info["raw"]["frame"]["info"]["width"]
-        yuv_data = yuv_frame.as_ndarray()
-        yuv_data = yuv_data.reshape((height * 3 // 2, width))
+        yuv_data = yuv_frame.as_ndarray().reshape((height * 3 // 2, width))
         bgr_frame = cv2.cvtColor(yuv_data, cv2.COLOR_YUV2BGR_I420)
         yuv_frame.unref()
-        # Convert the frame to a picklable format
-        self.frame_queue.put(bgr_frame)
+
+        # Skip frames to reduce processing load
+        if yuv_frame.info()["frame"]["frame_number"] % self.frame_skip == 0:
+            self.frame_queue.put(bgr_frame)
 
     def yuv_frame_processing(self):
         while True:
@@ -93,7 +94,6 @@ class StreamingExample:
             bgr_frame_resized = cv2.resize(bgr_frame, (640, 480))
             results = model(bgr_frame_resized)
             annotated_frame = results[0].plot()
-
             self.processed_frame_queue.put(annotated_frame)
 
     def process_video_output(self):
@@ -126,16 +126,12 @@ class StreamingExample:
         frame_pointer, frame_size = h264_frame.as_ctypes_pointer()
         info = h264_frame.info()
         frame_ts = info["ntp_raw_timestamp"]
-        if not bool(info["is_sync"]):
-            while len(self.h264_frame_stats) > 0:
-                start_ts, _ = self.h264_frame_stats[0]
-                if (start_ts + 1e6) < frame_ts:
-                    self.h264_frame_stats.pop(0)
-                else:
-                    break
+        if not info["is_sync"]:
+            while self.h264_frame_stats and (self.h264_frame_stats[0][0] + 1e6) < frame_ts:
+                self.h264_frame_stats.pop(0)
             self.h264_frame_stats.append((frame_ts, frame_size))
             h264_fps = len(self.h264_frame_stats)
-            h264_bitrate = 8 * sum(map(lambda t: t[1], self.h264_frame_stats))
+            h264_bitrate = 8 * sum(size for _, size in self.h264_frame_stats)
             self.h264_stats_writer.writerow({"fps": h264_fps, "bitrate": h264_bitrate})
 
     def fly(self):
@@ -152,7 +148,7 @@ class StreamingExample:
                             elif x_value < -20000:
                                 self.drone(moveBy(0, -1, 0, 0)).wait()
                                 print("Moving Left")
-                            elif abs(x_value) <= 20000:
+                            else:
                                 self.drone(moveBy(0, 0, 0, 0)).wait()
                         elif event.code == 'ABS_Y':
                             y_value = event.state
@@ -162,7 +158,7 @@ class StreamingExample:
                             elif y_value < -20000:
                                 self.drone(moveBy(1, 0, 0, 0)).wait()
                                 print("Moving Forwards")
-                            elif abs(y_value) <= 20000:
+                            else:
                                 self.drone(moveBy(0, 0, 0, 0)).wait()
                         elif event.code == 'ABS_RY':
                             y_value2 = event.state
@@ -172,7 +168,7 @@ class StreamingExample:
                             elif y_value2 < -20000:
                                 self.drone(moveBy(0, 0, 1, 0)).wait()
                                 print("Moving Upwards")
-                            elif abs(y_value2) <= 20000:
+                            else:
                                 self.drone(moveBy(0, 0, 0, 0)).wait()
                     elif event.ev_type == 'Key':
                         if event.code == 'BTN_SOUTH' and event.state == 1:
