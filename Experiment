@@ -1,4 +1,3 @@
-
 from ultralytics import YOLO
 import cv2
 import multiprocessing
@@ -10,6 +9,7 @@ from olympe.messages.ardrone3.Piloting import TakeOff, Landing
 from olympe.messages.ardrone3.Piloting import moveBy
 from olympe.messages.ardrone3.PilotingState import FlyingStateChanged
 import inputs
+import numpy as np
 
 olympe.log.update_config({"loggers": {"olympe": {"level": "WARNING"}}})
 
@@ -70,20 +70,21 @@ class StreamingExample:
 
     def yuv_frame_cb(self, yuv_frame):
         yuv_frame.ref()
-        self.frame_queue.put(yuv_frame)
+        frame_info = yuv_frame.info()
+        height, width = frame_info["raw"]["frame"]["info"]["height"], frame_info["raw"]["frame"]["info"]["width"]
+        yuv_data = yuv_frame.as_ndarray()
+        yuv_data = yuv_data.reshape((height * 3 // 2, width))
+        bgr_frame = cv2.cvtColor(yuv_data, cv2.COLOR_YUV2BGR_I420)
+        yuv_frame.unref()
+        # Convert the frame to a picklable format
+        self.frame_queue.put(bgr_frame)
 
     def yuv_frame_processing(self):
         while True:
             try:
-                yuv_frame = self.frame_queue.get(timeout=0.1)
+                bgr_frame = self.frame_queue.get(timeout=0.1)
             except queue.Empty:
                 continue
-
-            info = yuv_frame.info()
-            height, width = info["raw"]["frame"]["info"]["height"], info["raw"]["frame"]["info"]["width"]
-            yuv_data = yuv_frame.as_ndarray()
-            yuv_data = yuv_data.reshape((height * 3 // 2, width))
-            bgr_frame = cv2.cvtColor(yuv_data, cv2.COLOR_YUV2BGR_I420)
 
             bgr_frame_resized = cv2.resize(bgr_frame, (640, 480))
             results = model(bgr_frame_resized)
@@ -92,14 +93,13 @@ class StreamingExample:
             cv2.imshow('Machine Vision', annotated_frame)
             if cv2.waitKey(1) & 0xFF == ord('q'):
                 break
-            yuv_frame.unref()
         cv2.destroyAllWindows()
 
     def flush_cb(self, stream):
         if stream["vdef_format"] != olympe.VDEF_I420:
             return True
         while not self.frame_queue.empty():
-            self.frame_queue.get_nowait().unref()
+            self.frame_queue.get_nowait()
         return True
 
     def start_cb(self):
