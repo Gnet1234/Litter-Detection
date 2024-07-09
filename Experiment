@@ -14,23 +14,33 @@ from olympe.messages.ardrone3.Piloting import TakeOff, Landing
 from olympe.messages.ardrone3.Piloting import moveBy
 from olympe.messages.ardrone3.PilotingState import FlyingStateChanged
 from ultralytics import YOLO
+import time
 
 olympe.log.update_config({"loggers": {"olympe": {"level": "WARNING"}}})
 
+# Gets the drone IP address, and the port so the code can connect to it.
 DRONE_IP = os.environ.get("DRONE_IP", "192.168.42.1")
 DRONE_RTSP_PORT = os.environ.get("DRONE_RTSP_PORT")
 
-Model_Path = r"/home/labpc/Downloads/yolov8n-seg.pt"
+# Finds the model which is saved as a .pt file, and saves it to a variable.
+Model_Path = r"/home/labpc/Downloads/yolov5n.pt"
 model = YOLO(Model_Path)
+
+# Define debounce delay in seconds (adjust as needed)
+DEBOUNCE_DELAY = 0.3
 
 
 class StreamingExample:
     def __init__(self):
-        # Create the olympe.Drone object from its IP address
+        # Create the olympe.Drone object from its IP address.
         self.drone = olympe.Drone(DRONE_IP)
+        # Creates a temporary for storing output files.
         self.tempd = tempfile.mkdtemp(prefix="olympe_streaming_test_")
+        # Prints the path for the temporary directory.
         print(f"Olympe streaming example output dir: {self.tempd}")
+        # Opens an empty list to store h264 statistics.
         self.h264_frame_stats = []
+        # Opens a temporary directory for writing video stream statistics.
         self.h264_stats_file = open(os.path.join(self.tempd, "h264_stats.csv"), "w+")
         self.h264_stats_writer = csv.DictWriter(
             self.h264_stats_file, ["fps", "bitrate"]
@@ -174,41 +184,43 @@ class StreamingExample:
             self.h264_stats_writer.writerow({"fps": h264_fps, "bitrate": h264_bitrate})
 
     def fly(self):
+
+        # Initialize debounce timers for each button
+        debounce_tl = time.time()
+        debounce_tr = time.time()
+        debounce_tul = time.time()
+        debounce_tur = time.time()
+        debounce_au = time.time()
+        debounce_ad = time.time()
+
         try:
             while self.running.is_set():
+
                 events = inputs.get_gamepad()
                 for event in events:
                     if event.ev_type == 'Absolute':
-                        if event.code == 'ABS_X':
-                            x_value = event.state
-                            if x_value > 20000:  # Right
-                                self.drone(moveBy(0, 1, 0, 0)).wait()
-                                print("Moving Right")
-                            elif x_value < -20000:  # Left
-                                self.drone(moveBy(0, -1, 0, 0)).wait()
-                                print("Moving Left")
-                            elif abs(x_value) <= 20000:  # Deadzone for x_value
-                                self.drone(moveBy(0, 0, 0, 0)).wait()  # Stop movement
-                        elif event.code == 'ABS_Y':
-                            y_value = event.state
-                            if y_value > 20000:  # Backwards
-                                self.drone(moveBy(-1, 0, 0, 0)).wait()
-                                print("Moving Backwards")
-                            elif y_value < -20000:  # Forwards
-                                self.drone(moveBy(1, 0, 0, 0)).wait()
-                                print("Moving Forwards")
-                            elif abs(y_value) <= 20000:  # Deadzone for y_value
-                                self.drone(moveBy(0, 0, 0, 0)).wait()  # Stop movement
-                        elif event.code == 'ABS_RY':
+                        if event.code == 'ABS_RY':
                             y_value2 = event.state
-                            if y_value2 > 20000:  # Downward
+                            if y_value2 > 30000 and (time.time() - debounce_ad) > DEBOUNCE_DELAY:  # Downward
                                 self.drone(moveBy(0, 0, -1, 0)).wait()
                                 print("Moving Downwards")
-                            elif y_value2 < -20000:  # Upwards
+                                debounce_ad = time.time()
+                            elif y_value2 < -30000 and (time.time() - debounce_au) > DEBOUNCE_DELAY:  # Upwards
                                 self.drone(moveBy(0, 0, 1, 0)).wait()
                                 print("Moving Upwards")
-                            elif abs(y_value2) <= 20000:  # Deadzone for y_value2
+                                debounce_au = time.time()
+                            elif abs(y_value2) <= 30000:  # Deadzone for y_value2
                                 self.drone(moveBy(0, 0, 0, 0)).wait()  # Stop movement
+                        elif event.code == 'ABS_Z':
+                            if event.state <= 1000 and (time.time() - debounce_tul) > DEBOUNCE_DELAY:
+                                self.drone(moveBy(0, -1, 0, 0)).wait()
+                                print("Moving Left")
+                                debounce_tul = time.time()
+                        elif event.code == 'ABS_RZ':
+                            if event.state <= 1000 and (time.time() - debounce_tur) > DEBOUNCE_DELAY:
+                                self.drone(moveBy(0, 1, 0, 0)).wait()
+                                print("Moving Right")
+                                debounce_tur = time.time()
                     elif event.ev_type == 'Key':
                         if event.code == 'BTN_SOUTH' and event.state == 1:  # A button
                             self.drone(TakeOff())
@@ -222,6 +234,17 @@ class StreamingExample:
                         elif event.code == 'BTN_NORTH' and event.state == 1:  # X button
                             self.drone(moveBy(0, 0, 0, -1)).wait()
                             print("Turning counter clockwise")
+                        elif event.code == 'BTN_TL':
+                            if event.state == 1 and (time.time() - debounce_tl) > DEBOUNCE_DELAY:
+                                self.drone(moveBy(-1, 0, 0, 0)).wait()
+                                print("Moving Backwards")
+                                debounce_tl = time.time()
+                        elif event.code == 'BTN_TR':
+                            if event.state == 1 and (time.time() - debounce_tr) > DEBOUNCE_DELAY:
+                                self.drone(moveBy(1, 0, 0, 0)).wait()
+                                print("Moving Forwards")
+                                debounce_tr = time.time()
+
                         # Add more mappings for other buttons as needed
         except KeyboardInterrupt:
             print("Stopping control with Xbox controller...")
