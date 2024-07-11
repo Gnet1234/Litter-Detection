@@ -253,6 +253,7 @@ class StreamingExample:
         self.drone(Landing() >> FlyingStateChanged(state="landed", _timeout=5)).wait()
         print("Landed\n")
 
+
     def replay_with_vlc(self):
         # Replay this MP4 video file using VLC
         mp4_filepath = os.path.join(self.tempd, "streaming.mp4")
