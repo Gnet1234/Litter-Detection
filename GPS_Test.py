@@ -35,7 +35,7 @@ DEBOUNCE_DELAY = 0.3
 # Define a global DataFrame to store GPS data
 gps_data_df = pd.DataFrame(columns=['Timestamp', 'Latitude', 'Longitude', 'Altitude'])
 
-# gps_data_df = pd.DataFrame(columns=['Timestamp', 'Latitude', 'Longitude', 'Altitude', 'x'])
+
 
 class StreamingExample:
     def __init__(self):
