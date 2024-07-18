@@ -19,6 +19,7 @@ import pandas as pd
 from datetime import datetime
 
 
+
 olympe.log.update_config({"loggers": {"olympe": {"level": "WARNING"}}})
 
 # Gets the drone IP address, and the port so the code can connect to it.
@@ -35,7 +36,7 @@ DEBOUNCE_DELAY = 0.3
 # Define a global DataFrame to store GPS data
 gps_data_df = pd.DataFrame(columns=['Timestamp', 'Latitude', 'Longitude', 'Altitude'])
 
-
+# gps_data_df = pd.DataFrame(columns=['Timestamp', 'Latitude', 'Longitude', 'Altitude', 'x'])
 
 class StreamingExample:
     def __init__(self):
@@ -208,47 +209,31 @@ class StreamingExample:
             print("GPS position before take-off :", self.drone.get_state(HomeChanged))
             while True:
 
-                def main(stdscr):
-    # Initialize curses
-    curses.cbreak()
-    stdscr.keypad(True)
-    stdscr.nodelay(True)  # Make getch() non-blocking
+                if Motion_Check == True:
 
-    stdscr.addstr(0, 0, "Press 'r' to record GPS data. Press 'q' to quit.")
+                    # Wait for GPS location change
+                    gps_data = self.drone.get_state(GpsLocationChanged)
 
-    while True:
-        key = stdscr.getch()
-        if key == ord('r'):  # Replace 'r' with the key you want to check
-            # Wait for GPS location change
-            gps_data = self.drone.get_state(GpsLocationChanged)
 
-            # Extract coordinates, and record the time when it happens.
-            timestamp = datetime.now()
-            latitude = gps_data['latitude']
-            longitude = gps_data['longitude']
-            altitude = gps_data['altitude']
+                    # Extract coordinates, and records time when it happens.
+                    timestamp = datetime.now()
+                    latitude = gps_data['latitude']
+                    longitude = gps_data['longitude']
+                    altitude = gps_data['altitude']
 
-            # Print the GPS coordinates
-            stdscr.addstr(1, 0, f"Latitude: {latitude:.7f}, Longitude: {longitude:.7f}, Altitude: {altitude:.2f}")
-            stdscr.refresh()
+                    # Print the GPS coordinates
+                    print("Latitude: {:.7f}, Longitude: {:.7f}, Altitude: {:.2f}".format(latitude, longitude, altitude))
 
-            # Add the recorded data to the data frame (gps_data_df).
-            gps_data_df = pd.concat([gps_data_df, pd.DataFrame({
-                'Timestamp': [timestamp],
-                'Latitude': [latitude],
-                'Longitude': [longitude],
-                'Altitude': [altitude]
-            })], ignore_index=True)
+                    # Adds the recorded data to the data frame (gps_data_df).
+                    gps_data_df = pd.concat([gps_data_df, pd.DataFrame({
+                        'Timestamp': [timestamp],
+                        'Latitude': [latitude],
+                        'Longitude': [longitude],
+                        'Altitude': [altitude]
+                    })], ignore_index=True)
 
-            # Wait for the key to be released to avoid multiple recordings
-            while stdscr.getch() == ord('r'):
-                pass
-
-        elif key == ord('q'):  # Press 'q' to exit the loop
-            break
-
-if __name__ == "__main__":
-    curses.wrapper(main)
+                    # Sets the Boolean variable back to false.
+                    Motion_Check = False
 
                 # Creates an event based on the input of the gamepad.
                 events = inputs.get_gamepad()
