@@ -212,11 +212,14 @@ class StreamingExample:
                 stdscr.keypad(True)
                 stdscr.nodelay(True)  # Make getch() non-blocking
                 stdscr.addstr(0, 0, "Press 'r' to record GPS data. Press 'q' to quit.")
+                stdscr.refresh()
 
                 while True:
                     key = stdscr.getch()
                     if key == ord('r'):  # Replace 'r' with the key you want to check
                         Motion_Check = True
+                        stdscr.addstr(1, 0, "Motion_Check set to True")
+                        stdscr.refresh()
                     elif key == ord('q'):  # Press 'q' to exit the loop
                         break
 
@@ -224,6 +227,7 @@ class StreamingExample:
 
             while True:
                 if Motion_Check:
+                    print("Motion_Check is True, logging GPS data")
                     # Wait for GPS location change
                     gps_data = self.drone.get_state(GpsLocationChanged)
 
