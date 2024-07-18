@@ -10,10 +10,9 @@ import threading
 import multiprocessing
 import inputs  # Importing the gamepad library
 import olympe
-from olympe.messages.ardrone3.Piloting import TakeOff, Landing
-from olympe.messages.ardrone3.Piloting import moveBy
+from olympe.messages.ardrone3.Piloting import TakeOff, Landing, moveBy
 from olympe.messages.ardrone3.PilotingState import FlyingStateChanged, GpsLocationChanged
-from olympe.messages.ardrone3.GPSSettingsState import GPSFixStateChanged, HomeChanged
+from olympe.messages.ardrone3.GPSSettingsState import GPSFixStateChanged
 from ultralytics import YOLO
 import time
 import pandas as pd
@@ -32,12 +31,16 @@ model = YOLO(Model_Path)
 # Define debounce delay in seconds (adjust as needed)
 DEBOUNCE_DELAY = 0.3
 
-global gps_data_df  # Declare gps_data_df as global
-
+# Declare gps_data_df as global
+global gps_data_df
 # Define a global DataFrame to store GPS data
 gps_data_df = pd.DataFrame(columns=['Timestamp', 'Latitude', 'Longitude', 'Altitude'])
 
-
+def wait_for_gps_fix(drone):
+    """
+    Waits until the drone acquires a GPS fix.
+    """
+    drone(GPSFixStateChanged(_policy="wait", _timeout=10)).wait()
 
 class StreamingExample:
     def __init__(self):
@@ -123,9 +126,9 @@ class StreamingExample:
         yuv_frame.unref()
 
     def yuv_frame_processing(self, running):
+        global gps_data_df
         while running.is_set():
             try:
-
                 yuv_data, height, width = self.frame_queue.get(timeout=0.1)
             except queue.Empty:
                 continue
@@ -220,6 +223,8 @@ class StreamingExample:
             self.h264_stats_writer.writerow({"fps": h264_fps, "bitrate": h264_bitrate})
 
     def fly(self):
+        # Wait for GPS fix before flying
+        wait_for_gps_fix(self.drone)
 
         # Initialize debounce timers for each button
         debounce_tl = time.time()
@@ -231,8 +236,6 @@ class StreamingExample:
 
         try:
             while self.running.is_set():
-
-
                 events = inputs.get_gamepad()
                 for event in events:
                     if event.ev_type == 'Absolute':
@@ -290,8 +293,6 @@ class StreamingExample:
         self.drone(Landing() >> FlyingStateChanged(state="landed", _timeout=5)).wait()
         print("Landed\n")
 
-
-
     def replay_with_vlc(self):
         # Replay this MP4 video file using VLC
         mp4_filepath = os.path.join(self.tempd, "streaming.mp4")
@@ -303,7 +304,6 @@ def save_to_excel(df):
     df.to_excel(filename, index=False, engine='openpyxl')
     print(f"GPS data saved to {filename}")
 
-
 def test_streaming():
     streaming_example = StreamingExample()
     # Start the video stream
@@ -314,7 +314,6 @@ def test_streaming():
     streaming_example.stop()
     # Recorded video stream postprocessing
     # streaming_example.replay_with_vlc()
-
 
 if __name__ == "__main__":
     test_streaming()
