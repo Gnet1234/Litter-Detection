@@ -40,7 +40,14 @@ def wait_for_gps_fix(drone):
     """
     Waits until the drone acquires a GPS fix.
     """
-    drone(GPSFixStateChanged(_policy="wait", _timeout=10)).wait()
+    gps_fix_acquired = False
+    while not gps_fix_acquired:
+        gps_fix_state = drone.get_state(GPSFixStateChanged)
+        gps_fix_acquired = gps_fix_state['fixed']
+        if not gps_fix_acquired:
+            print("Waiting for GPS fix...")
+            time.sleep(1)
+    print("GPS fix acquired.")
 
 class StreamingExample:
     def __init__(self):
@@ -147,8 +154,14 @@ class StreamingExample:
             if boxes is not None and boxes.size(0) > 0:
                 print("Objects detected!")
                 # Wait for GPS location change
-                gps_data = self.drone.get_state(GpsLocationChanged)
-
+                gps_data = None
+                while gps_data is None:
+                    try:
+                        gps_data = self.drone.get_state(GpsLocationChanged)
+                    except ValueError:
+                        print("Waiting for GPS data...")
+                        time.sleep(1)
+                
                 # Extract coordinates, and records time when it happens.
                 timestamp = datetime.now()
                 latitude = gps_data['latitude']
