@@ -208,31 +208,47 @@ class StreamingExample:
             print("GPS position before take-off :", self.drone.get_state(HomeChanged))
             while True:
 
-                if Motion_Check == True:
+                def main(stdscr):
+    # Initialize curses
+    curses.cbreak()
+    stdscr.keypad(True)
+    stdscr.nodelay(True)  # Make getch() non-blocking
 
-                    # Wait for GPS location change
-                    gps_data = self.drone.get_state(GpsLocationChanged)
+    stdscr.addstr(0, 0, "Press 'r' to record GPS data. Press 'q' to quit.")
 
+    while True:
+        key = stdscr.getch()
+        if key == ord('r'):  # Replace 'r' with the key you want to check
+            # Wait for GPS location change
+            gps_data = self.drone.get_state(GpsLocationChanged)
 
-                    # Extract coordinates, and records time when it happens.
-                    timestamp = datetime.now()
-                    latitude = gps_data['latitude']
-                    longitude = gps_data['longitude']
-                    altitude = gps_data['altitude']
+            # Extract coordinates, and record the time when it happens.
+            timestamp = datetime.now()
+            latitude = gps_data['latitude']
+            longitude = gps_data['longitude']
+            altitude = gps_data['altitude']
 
-                    # Print the GPS coordinates
-                    print("Latitude: {:.7f}, Longitude: {:.7f}, Altitude: {:.2f}".format(latitude, longitude, altitude))
+            # Print the GPS coordinates
+            stdscr.addstr(1, 0, f"Latitude: {latitude:.7f}, Longitude: {longitude:.7f}, Altitude: {altitude:.2f}")
+            stdscr.refresh()
 
-                    # Adds the recorded data to the data frame (gps_data_df).
-                    gps_data_df = pd.concat([gps_data_df, pd.DataFrame({
-                        'Timestamp': [timestamp],
-                        'Latitude': [latitude],
-                        'Longitude': [longitude],
-                        'Altitude': [altitude]
-                    })], ignore_index=True)
+            # Add the recorded data to the data frame (gps_data_df).
+            gps_data_df = pd.concat([gps_data_df, pd.DataFrame({
+                'Timestamp': [timestamp],
+                'Latitude': [latitude],
+                'Longitude': [longitude],
+                'Altitude': [altitude]
+            })], ignore_index=True)
 
-                    # Sets the Boolean variable back to false.
-                    Motion_Check = False
+            # Wait for the key to be released to avoid multiple recordings
+            while stdscr.getch() == ord('r'):
+                pass
+
+        elif key == ord('q'):  # Press 'q' to exit the loop
+            break
+
+if __name__ == "__main__":
+    curses.wrapper(main)
 
                 # Creates an event based on the input of the gamepad.
                 events = inputs.get_gamepad()
