@@ -143,7 +143,7 @@ class StreamingExample:
                 continue
 
             cv2.imshow('Machine Vision', frame)
-            if cv2.waitKey(1) & 0xFF == ord('q'):
+            if cv2.waitKey(1) & 0xFF == ord('r'):
                 self.running.clear()
                 break
 
