@@ -34,7 +34,7 @@ model = YOLO(Model_Path)
 DEBOUNCE_DELAY = 0.3
 
 # Define a global DataFrame to store GPS data
-gps_data_df = pd.DataFrame(columns=['Timestamp', 'Latitude (Degrees)', 'Longitude (Degrees)', 'Altitude (ft)', 'Objects'])
+gps_data_df = pd.DataFrame(columns=['Timestamp', 'Latitude (Degrees)', 'Longitude (Degrees)', 'Altitude (ft)', 'Objects', 'Confidence'])
 
 # Define the key to check
 key_to_check = 'g'  # Example: 'a' key
@@ -174,10 +174,6 @@ class StreamingExample:
             # Get frame data from queue
             yuv_data, height, width = self.frame_queue.get()
 
-            # Validate the dimensions and data
-            # if yuv_data.size != height * width * 3 // 2:
-            #    raise ValueError("YUV data size does not match expected dimensions")
-
             # Reshape and convert YUV to BGR
             yuv_data = yuv_data.reshape((height * 3 // 2, width))
             bgr_frame = cv2.cvtColor(yuv_data, cv2.COLOR_YUV2BGR_I420)
@@ -244,7 +240,6 @@ class StreamingExample:
                         print("It worked")
                         # Wait for GPS location change
                         results = self.Frame_Check()
-                        #print(results)
                         gps_data = self.drone.get_state(GpsLocationChanged)
 
                         # Extract coordinates, and records time when it happens.
@@ -257,11 +252,14 @@ class StreamingExample:
                         detected_objects = []
                         for result in results:
                             labels = result.boxes.cls.cpu().numpy()  # Convert tensor to numpy array
+                            confidences = result.boxes.conf.cpu().numpy()  # Convert tensor to numpy array
 
                         for i, label in enumerate(labels):
                             class_id = int(label)  # Convert tensor label to integer
                             object_name = class_names.get(class_id, "unknown")  # Get object name
                             detected_objects.append(object_name)
+
+                        a = confidences
 
                         # Adds the recorded data to the data frame (gps_data_df).
                         gps_data_df = pd.concat([gps_data_df, pd.DataFrame({
@@ -269,7 +267,8 @@ class StreamingExample:
                             'Latitude (Degrees)': [latitude],
                             'Longitude (Degrees)': [longitude],
                             'Altitude (ft)': [altitude],
-                            'Objects': [detected_objects]
+                            'Objects': [detected_objects],
+                            'Confidence': [a]
                         })], ignore_index=True)
                     else:
                         print("GPS logging stopped.")
@@ -375,7 +374,7 @@ class StreamingExample:
 
 def save_to_excel(df):
     # Save DataFrame to Excel file
-    filename = 'gps_data6.xlsx'
+    filename = 'gps_data10.xlsx'
     df.to_excel(filename, index=False, engine='openpyxl')
     print(f"GPS data saved to {filename}")
 
