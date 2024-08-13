@@ -13,7 +13,7 @@ import olympe
 from olympe.messages.ardrone3.Piloting import TakeOff, Landing
 from olympe.messages.ardrone3.Piloting import moveBy
 from olympe.messages.ardrone3.PilotingState import FlyingStateChanged, GpsLocationChanged
-from olympe.messages.ardrone3.GPSSettingsState import GPSFixStateChanged, HomeChanged
+from olympe.messages.gimbal import set_target
 from ultralytics import YOLO
 import time
 import pandas as pd
@@ -27,17 +27,24 @@ DRONE_IP = os.environ.get("DRONE_IP", "192.168.42.1")
 DRONE_RTSP_PORT = os.environ.get("DRONE_RTSP_PORT")
 
 # Finds the model which is saved as a .pt file, and saves it to a variable.
-Model_Path = r"/home/labpc/Downloads/yolov5nu.pt"
+Model_Path = r"/home/labpc/Downloads/Water_Can_Version2.pt"
 model = YOLO(Model_Path)
 
 # Define debounce delay in seconds (adjust as needed)
 DEBOUNCE_DELAY = 0.3
 
 # Define a global DataFrame to store GPS data
-gps_data_df = pd.DataFrame(columns=['Timestamp', 'Latitude (Degrees)', 'Longitude (Degrees)', 'Altitude (ft)'])
+gps_data_df = pd.DataFrame(columns=['Timestamp', 'Latitude (Degrees)', 'Longitude (Degrees)', 'Altitude (ft)', 'Objects', 'Confidence'])
 
 # Define the key to check
-key_to_check = 'a'  # Example: 'a' key
+key_to_check = 'g'  # Example: 'a' key
+
+# Dictionary to map class IDs to object names
+class_names = {
+    1: 'Water Bottle',       # Example class IDs and names
+    0: 'Metal Can',
+    # Add other class IDs and names as needed
+}
 class StreamingExample:
     def __init__(self):
         # Create the olympe.Drone object from its IP address.
@@ -162,6 +169,34 @@ class StreamingExample:
     def end_cb(self):
         pass
 
+    def Frame_Check(self):
+        try:
+            # Get frame data from queue
+            yuv_data, height, width = self.frame_queue.get()
+
+            # Reshape and convert YUV to BGR
+            yuv_data = yuv_data.reshape((height * 3 // 2, width))
+            bgr_frame = cv2.cvtColor(yuv_data, cv2.COLOR_YUV2BGR_I420)
+
+            # Run inference
+            results = model(bgr_frame)
+
+            return results
+
+        except queue.Empty:
+            # Handle empty queue case
+            print("Queue was empty")
+            return None
+        except cv2.error as e:
+            # Handle OpenCV errors
+            print(f"OpenCV error: {e}")
+            return None
+        except Exception as e:
+            # Handle other exceptions
+            print(f"Unexpected error: {e}")
+            return None
+
+
     def h264_frame_cb(self, h264_frame):
         """
         This function will be called by Olympe for each new h264 frame.
@@ -204,6 +239,7 @@ class StreamingExample:
                         print("GPS logging started.")
                         print("It worked")
                         # Wait for GPS location change
+                        results = self.Frame_Check()
                         gps_data = self.drone.get_state(GpsLocationChanged)
 
                         # Extract coordinates, and records time when it happens.
@@ -212,15 +248,27 @@ class StreamingExample:
                         longitude = gps_data['longitude']
                         altitude = gps_data['altitude']
 
-                        # Print the GPS coordinates
-                        # print("Latitude: {:.7f}, Longitude: {:.7f}, Altitude: {:.2f}".format(latitude, longitude, altitude))
+                        # Process detection results
+                        detected_objects = []
+                        for result in results:
+                            labels = result.boxes.cls.cpu().numpy()  # Convert tensor to numpy array
+                            confidences = result.boxes.conf.cpu().numpy()  # Convert tensor to numpy array
+
+                        for i, label in enumerate(labels):
+                            class_id = int(label)  # Convert tensor label to integer
+                            object_name = class_names.get(class_id, "unknown")  # Get object name
+                            detected_objects.append(object_name)
+
+                        a = confidences
 
                         # Adds the recorded data to the data frame (gps_data_df).
                         gps_data_df = pd.concat([gps_data_df, pd.DataFrame({
                             'Timestamp': [timestamp],
-                            'Latitude': [latitude],
-                            'Longitude': [longitude],
-                            'Altitude': [altitude]
+                            'Latitude (Degrees)': [latitude],
+                            'Longitude (Degrees)': [longitude],
+                            'Altitude (ft)': [altitude],
+                            'Objects': [detected_objects],
+                            'Confidence': [a]
                         })], ignore_index=True)
                     else:
                         print("GPS logging stopped.")
@@ -245,6 +293,8 @@ class StreamingExample:
         debounce_tur = time.time()
         debounce_au = time.time()
         debounce_ad = time.time()
+        debounce_Gi = time.time()
+        debounce_rs = time.time()
 
         # Define global variables
         gps_logging_active = False  # Initialize global variable
@@ -252,8 +302,11 @@ class StreamingExample:
         # Start the keyboard listener in a separate thread
         keyboard_listener = self.start_keyboard_listener()
 
-        try:
+        # Variable to keep track of camera position
+        V = 0
+        H = 0
 
+        try:
             while self.running.is_set():
 
                 events = inputs.get_gamepad()
@@ -262,11 +315,11 @@ class StreamingExample:
                         if event.code == 'ABS_RY':
                             y_value2 = event.state
                             if y_value2 > 30000 and (time.time() - debounce_ad) > DEBOUNCE_DELAY:  # Downward
-                                self.drone(moveBy(0, 0, -1, 0)).wait()
+                                self.drone(moveBy(0, 0, -0.25, 0)).wait()
                                 print("Moving Downwards")
                                 debounce_ad = time.time()
                             elif y_value2 < -30000 and (time.time() - debounce_au) > DEBOUNCE_DELAY:  # Upwards
-                                self.drone(moveBy(0, 0, 1, 0)).wait()
+                                self.drone(moveBy(0, 0, 0.25, 0)).wait()
                                 print("Moving Upwards")
                                 debounce_au = time.time()
                             elif abs(y_value2) <= 30000:  # Deadzone for y_value2
@@ -276,13 +329,64 @@ class StreamingExample:
                                 self.drone(moveBy(0, -1, 0, 0)).wait()
                                 print("Moving Left")
                                 debounce_tul = time.time()
-
                         elif event.code == 'ABS_RZ':
                             if event.state <= 1000 and (time.time() - debounce_tur) > DEBOUNCE_DELAY:
                                 self.drone(moveBy(0, 1, 0, 0)).wait()
                                 print("Moving Right")
                                 debounce_tur = time.time()
+                        elif event.code == 'ABS_HAT0Y':
+                            value = event.state
+                            if value == -1 and (time.time() - debounce_Gi) > DEBOUNCE_DELAY:
+                                # Set the gimbal target orientation
+                                # Uses upwards keypad on the controller
+                                H = V + 10
+                                gimbal_command = set_target(
+                                    gimbal_id=0,
+                                    control_mode="position",  # Use "velocity" for smooth movement
+                                    yaw_frame_of_reference="absolute",  # Can be "relative" or "absolute"
+                                    yaw=0.0,
+                                    pitch_frame_of_reference="absolute",  # Use "absolute" or "relative"
+                                    pitch=H,
+                                    roll_frame_of_reference="absolute",  # Use "absolute" or "relative"
+                                    roll=0.0,
+                                )
 
+                                # Send the command and wait for the completion
+                                command_result = self.drone(gimbal_command).wait()
+
+                                # Check if the command was successful
+                                if command_result.success():
+                                    print("Gimbal target orientation set successfully.")
+                                else:
+                                    print("Failed to set gimbal target orientation.")
+
+                                V = H
+
+                            elif value == 1 and (time.time() - debounce_Gi) > DEBOUNCE_DELAY:
+                                # Set the gimbal target orientation
+                                # Uses downwards keypad on the controller
+                                H = V - 10
+                                gimbal_command = set_target(
+                                    gimbal_id=0,
+                                    control_mode="position",  # Use "velocity" for smooth movement
+                                    yaw_frame_of_reference="absolute",  # Can be "relative" or "absolute"
+                                    yaw=0.0,
+                                    pitch_frame_of_reference="absolute",  # Use "absolute" or "relative"
+                                    pitch=H,
+                                    roll_frame_of_reference="absolute",  # Use "absolute" or "relative"
+                                    roll=0.0,
+                                )
+
+                                # Send the command and wait for the completion
+                                command_result = self.drone(gimbal_command).wait()
+
+                                # Check if the command was successful
+                                if command_result.success():
+                                    print("Gimbal target orientation set successfully.")
+                                else:
+                                    print("Failed to set gimbal target orientation.")
+
+                                V = H
                     elif event.ev_type == 'Key':
                         if event.code == 'BTN_SOUTH' and event.state == 1:  # A button
                             self.drone(TakeOff())
@@ -327,9 +431,11 @@ class StreamingExample:
 
 def save_to_excel(df):
     # Save DataFrame to Excel file
-    filename = 'gps_data6.xlsx'
+    filename = 'MetalCan.xlsx'
     df.to_excel(filename, index=False, engine='openpyxl')
     print(f"GPS data saved to {filename}")
+
+
 
 
 def test_streaming():
