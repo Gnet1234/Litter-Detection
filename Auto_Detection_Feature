@@ -285,8 +285,6 @@ class StreamingExample:
                             'Objects': [detected_objects],
                             'Confidence': [confidences]
                         })], ignore_index=True)
-
-                    print("The system has detected an object, and is recording it.")
             time.sleep(0.1)
 
     def start_monitor_thread(self):
