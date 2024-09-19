@@ -112,10 +112,6 @@ class StreamingExample:
         self.output_thread = threading.Thread(target=self.process_video_output)
         self.output_thread.start()
 
-        # Start the video output processing thread
-        self.output_thread = threading.Thread(target=self.process_video_output)
-        self.output_thread.start()
-
         # Moved Monitor thread initialization here
         self.monitor_thread = self.start_monitor_thread()  # Ensure monitor runs independently
 
