@@ -1,6 +1,20 @@
 import olympe
 from olympe.messages.skyctrl.CoPiloting import setPilotingSource
-SKYCTRL_IP="192.168.53.1"
+
+SKYCTRL_IP = "192.168.53.1"
 my_drone = olympe.Drone(SKYCTRL_IP)
+
 my_drone.connect()
 my_drone(setPilotingSource(source="Controller")).wait()
+
+try:
+    while True:
+        user_input = input("Press Enter to continue setting the piloting source, or type 'exit' to quit: ")
+        if user_input.lower() == 'exit':
+            print("Exiting the loop.")
+            break
+        my_drone(setPilotingSource(source="Controller")).wait()
+except KeyboardInterrupt:
+    print("Loop interrupted.")
+finally:
+    my_drone.disconnect()
