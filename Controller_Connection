@@ -1,0 +1,6 @@
+import olympe
+from olympe.messages.skyctrl.CoPiloting import setPilotingSource
+SKYCTRL_IP="192.168.53.1"
+my_drone = olympe.Drone(SKYCTRL_IP)
+my_drone.connect()
+my_drone(setPilotingSource(source="Controller")).wait()
