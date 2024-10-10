@@ -20,3 +20,4 @@ More information about the inputs library can be found here: https://inputs.read
 
 - Final_Yolo_Video: This code is the same as the Video_And_Motion code, but it doesn’t have the ability to control the motion of the drone. This code was used to test the compatibility of the drones video feature. 
 
+- Possible Source of information: https://github.com/bkbilly/parrot-gamepad
