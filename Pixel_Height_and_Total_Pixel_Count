@@ -30,12 +30,17 @@ olympe.log.update_config({"loggers": {"olympe": {"level": "WARNING"}}})
 DRONE_IP = os.environ.get("DRONE_IP", "192.168.42.1")
 DRONE_RTSP_PORT = os.environ.get("DRONE_RTSP_PORT")
 
+# Basic Water Bottle height (19.3 cm)
+# The test will be done with the maximum zoom distance, and at a set distance of 30 cm.
+# The 1.0 zoom test was done at 30 cm from the drone.
+# The 3,0 zoom was tested at a distance of 101.5 cm from the drone. 
 
 # Finds the model which is saved as a .pt file, and saves it to a variable.
 Model_Path = r"/home/labpc/Downloads/Water_Can_Version2.pt"
 UAV_Model_Path = r"/home/labpc/Downloads/UAVVaste_Test_1t.pt"
 OG_Model_Path = r"/home/labpc/Downloads/yolov8n-seg.pt"
-model = YOLO(OG_Model_Path)
+Bottle_Path = r"/home/labpc/Downloads/Bottle.pt"
+model = YOLO(Bottle_Path)
 
 # Define debounce delay in seconds (adjust as needed)
 DEBOUNCE_DELAY = 0.3
@@ -48,8 +53,8 @@ key_to_check = 'g'  # Example: 'a' key
 
 # Dictionary to map class IDs to object names
 class_names = {
-    1: 'Water Bottle',       # Example class IDs and names
-    0: 'Metal Can',
+    1: 'Metal Can',       # Example class IDs and names
+    0: 'Water Bottle',
     # Add other class IDs and names as needed
 }
 class StreamingExample:
@@ -294,29 +299,39 @@ class StreamingExample:
                         object_name = class_names.get(class_id, "unknown")  # Get object name
                         detected_objects.append(object_name)
 
-                    # Calculate area of detected objects and their heights
-                    for i, (mask, bbox) in enumerate(zip(results[0].masks.data, results[0].boxes.xyxy)):
-                        # Convert mask to binary
-                        # Calculate pixel height of the object from bounding box
-                        x_min, y_min, x_max, y_max = map(int, bbox)
-                        Pixel_Height = y_max - y_min
-                        pixel_height.append(Pixel_Height)
+                    # Check if results contain valid data
+                    if results and hasattr(results[0], 'masks') and hasattr(results[0].masks, 'data') and hasattr(
+                            results[0], 'boxes'):
+                        for i, (mask, bbox) in enumerate(zip(results[0].masks.data, results[0].boxes.xyxy)):
+                            # Convert mask to binary
+                            # Calculate pixel height of the object from bounding box
+                            x_min, y_min, x_max, y_max = map(int, bbox)
+                            Pixel_Height = y_max - y_min
+                            pixel_height.append(Pixel_Height)
 
-                        print(f"Object {i + 1}:")
-                        print(f" - Pixel Height: {pixel_height} pixels")
+                            print(f"Object {i + 1}:")
+                            print(f" - Pixel Height: {pixel_height} pixels")
+                    else:
+                        print("No objects detected or invalid results format.")
+
+                    # Prepare the new data as a DataFrame
+                    new_data = pd.DataFrame({
+                        'Timestamp': [timestamp],
+                        'Latitude (Degrees)': [latitude],
+                        'Longitude (Degrees)': [longitude],
+                        'Altitude (ft)': [altitude],
+                        'Objects': [detected_objects],
+                        'Confidence': [confidences],
+                        'Pixel Count': [pixel_counts],
+                        'Pixel Height': [pixel_height]
+                    })
+
+                    # Filter out columns that are empty or entirely NA
+                    new_data = new_data.dropna(axis=1, how='all')
 
                     # Use the lock to ensure thread-safe access to gps_data_df
                     with self.lock:
-                        gps_data_df = pd.concat([gps_data_df, pd.DataFrame({
-                            'Timestamp': [timestamp],
-                            'Latitude (Degrees)': [latitude],
-                            'Longitude (Degrees)': [longitude],
-                            'Altitude (ft)': [altitude],
-                            'Objects': [detected_objects],
-                            'Confidence': [confidences],
-                            'Pixel Count': [pixel_counts],
-                            'Pixel Height': [pixel_height]
-                        })], ignore_index=True)
+                        gps_data_df = pd.concat([gps_data_df, new_data], ignore_index=True)
 
             time.sleep(0.1)
 
@@ -390,7 +405,7 @@ class StreamingExample:
             set_zoom_target_command = set_zoom_target(
                 cam_id=0,
                 control_mode='level',
-                target=1.0,
+                target=2.9999840259552
             )
             # Max distance is 2.9999840259552 (value for the target).
             zoom_result = self.drone(set_zoom_target_command).wait()
@@ -554,7 +569,7 @@ class StreamingExample:
 
 def save_to_excel(df):
     # Save DataFrame to Excel file
-    filename = 'Demonstration.xlsx'
+    filename = 'Pixel_To_cm_Ratio(3.0 zoom).xlsx'
     df.to_excel(filename, index=False, engine='openpyxl')
     print(f"GPS data saved to {filename}")
 
