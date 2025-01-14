@@ -318,10 +318,20 @@ class StreamingExample:
                             # Convert mask to binary
                             # Calculate pixel height of the object from bounding box
                             x_min, y_min, x_max, y_max = map(int, bbox)
-                            Pixel_Height = y_max - y_min
+                            # Calculate the width and height with the use of the bounding box
+                            box_width = x_max - x_min
+                            box_height = y_max - y_max
+
+                            if box_height >= box_width:
+                                Pixel_Height = box_height
+                            else:
+                                Pixel_Height = box_width
+
                             # Adds the values to the variable
                             pixel_height.append(Pixel_Height)
-                            Static_Height = altitude - 30
+                            # Static_Height is in feet, which is then converted into centimeters 
+                            #Static_Height = altitude - Initial_Altitude
+                            Static_Height = 5
                             Static_Height_cm = Static_Height * 30.48
                             # Once the static height is found the distance scaling factor can be calculated
                             DSF = TD / Static_Height_cm
