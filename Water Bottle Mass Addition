@@ -48,7 +48,7 @@ model = YOLO(Bottle_Path)
 DEBOUNCE_DELAY = 0.3
 
 # Define a global DataFrame to store GPS data
-gps_data_df = pd.DataFrame(columns=['Timestamp', 'Latitude (Degrees)', 'Longitude (Degrees)', 'Altitude (ft)', 'Objects', 'Confidence', 'Pixel Count', 'PSF', 'DSF', 'Pixel Height', 'True Height', 'Water Bottle Mass'])
+gps_data_df = pd.DataFrame(columns=['Timestamp', 'Latitude (Degrees)', 'Longitude (Degrees)', 'Altitude (ft)', 'Objects', 'Confidence', 'Pixel Count', 'PSF', 'DSF', 'Pixel Height', 'True Height (cm)', 'Water Bottle Mass (g)'])
 
 # This is in cm per pixel
 PSF = 0.057692308
@@ -58,7 +58,7 @@ fy = 777.69
 
 # This is for the tested distance which would be used to calculate the distance scaling factor
 # The distance is in centimeters
-TD = 30
+TD = 30.0
 
 # Define the key to check
 key_to_check = 'g'  # Example: 'a' key
@@ -67,7 +67,7 @@ key_to_check = 'g'  # Example: 'a' key
 Initial_Altitude = 0
 
 # Outer radius of a PET water bottle (cm)
-r = 3
+r = 3.0
 
 # Thickness of wall (cm)
 t = 0.03
@@ -337,7 +337,8 @@ class StreamingExample:
                             x_min, y_min, x_max, y_max = map(int, bbox)
                             box_width = x_max - x_min
                             box_height = y_max - y_min
-
+                            
+                            # Uses the longest side of the detected object as the pixel height. 
                             if box_height > box_width:
                                 Pixel_Height = box_height
                             else:
@@ -345,9 +346,11 @@ class StreamingExample:
 
                             # Adds the values to the variable
                             pixel_height.append(Pixel_Height)
+                            
+                            
 
                             # Current distance of the object from the drone in centimeters
-                            Current_disance = 25
+                            Current_disance = 25.0
 
                             # Distance scaling factor
                             DSF = Current_disance / TD
@@ -360,11 +363,16 @@ class StreamingExample:
                             # The distance can now be calculated by multiplying the distance and pixel scaling factors
                             PHT = (Pixel_Height / FA) * Current_disance
 
+                            PHT = float(PHT)
+
                             True_Height.append(PHT)
 
-                            Vouter = math.pi * (r ^2) * PHT
 
-                            Vinner = math.pi * ((r - t)^2) * PHT
+                            n = float(2.0)
+
+                            Vouter = 3.14 * (r ** n) * PHT
+
+                            Vinner = 3.14 * ((r - t) ** n) * PHT
 
                             Vwater = Vouter - Vinner
 
@@ -393,8 +401,8 @@ class StreamingExample:
                         'PSF': [Pixel_Scalling_Factor],
                         'DSF': [Distance_Scalling_Factor],
                         'Pixel Height': [pixel_height],
-                        'True Height': [True_Height],
-                        'Water Bottle Mass': [Water_Bottle_Mass]
+                        'True Height (cm)': [True_Height],
+                        'Water Bottle Mass (g)': [Water_Bottle_Mass]
                     })
 
                     # Filter out columns that are empty or entirely NA
@@ -413,63 +421,6 @@ class StreamingExample:
 
     def stop_monitor(self):
         self.running.clear()  # Stops the Monitor loop
-
-    def start_keyboard_listener(self):
-        def on_press(key):
-            global gps_logging_active  # Declare gps_logging_active as global
-            global gps_data_df
-
-            try:
-                # Prints the location of the drone before taking off.
-                #print("GPS position before take-off :", self.drone.get_state(HomeChanged))
-                if key.char == 'g':  # Start/Stop GPS logging with 'g' key
-                    gps_logging_active = not gps_logging_active
-                    if gps_logging_active:
-                        print("GPS logging started.")
-                        print("It worked")
-                        # Wait for GPS location change
-                        results = self.Frame_Check()
-                        print(results)
-                        gps_data = self.drone.get_state(GpsLocationChanged)
-
-                        # Extract coordinates, and records time when it happens.
-                        timestamp = datetime.now()
-                        latitude = gps_data['latitude']
-                        longitude = gps_data['longitude']
-                        altitude = gps_data['altitude']
-
-                        # Process detection results
-                        detected_objects = []
-                        for result in results:
-                            labels = result.boxes.cls.cpu().numpy()  # Convert tensor to numpy array
-                            confidences = result.boxes.conf.cpu().numpy()  # Convert tensor to numpy array
-
-                        for i, label in enumerate(labels):
-                            class_id = int(label)  # Convert tensor label to integer
-                            object_name = class_names.get(class_id, "unknown")  # Get object name
-                            detected_objects.append(object_name)
-
-                        a = confidences
-
-                        # Adds the recorded data to the data frame (gps_data_df).
-                        gps_data_df = pd.concat([gps_data_df, pd.DataFrame({
-                            'Timestamp': [timestamp],
-                            'Latitude (Degrees)': [latitude],
-                            'Longitude (Degrees)': [longitude],
-                            'Altitude (ft)': [altitude],
-                            'Objects': [detected_objects],
-                            'Confidence': [a]
-                        })], ignore_index=True)
-                    else:
-                        print("GPS logging stopped.")
-            except AttributeError:
-                # Handle special keys or other exceptions if needed
-                pass
-
-        # Setup the keyboard listener
-        keyboard_listener = keyboard.Listener(on_press=on_press)
-        keyboard_listener.start()
-        return keyboard_listener
 
     def Zoom(self):
         try:
@@ -508,9 +459,6 @@ class StreamingExample:
 
         # Define global variables
         gps_logging_active = False  # Initialize global variable
-
-        # Start the keyboard listener in a separate thread
-        keyboard_listener = self.start_keyboard_listener()
 
         # Variable to keep track of camera position
         V = 0
@@ -631,7 +579,7 @@ class StreamingExample:
             print("GPS monitoring stopped.")
             # Save data to Excel file
             save_to_excel(gps_data_df)
-            keyboard_listener.stop()  # Stop the keyboard listener
+
 
         print("Landing...")
         self.drone(Landing() >> FlyingStateChanged(state="landed", _timeout=5)).wait()
@@ -645,7 +593,7 @@ class StreamingExample:
 
 def save_to_excel(df):
     # Save DataFrame to Excel file
-    filename = 'Height_test(45 cm).xlsx'
+    filename = 'Mass_Calculation_Test(45 cm).xlsx'
     df.to_excel(filename, index=False, engine='openpyxl')
     print(f"GPS data saved to {filename}")
 
